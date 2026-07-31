@@ -107,36 +107,57 @@ export class PaymentSubmissionsService {
       const rejectionReason = verifyResult.reason || 'Verification failed';
       const status: SubmissionStatus = verifyResult.confirmedBefore ? 'DUPLICATE' : 'REJECTED';
 
-      const failedSubmission = await this.prisma.paymentSubmission.create({
-        data: {
-          batchId: dto.batchId,
-          bank: dto.bank,
-          referenceNumber: normalizedRef,
-          participantPhone: dto.participantPhone,
-          participantName: dto.participantName || verifyResult.payerName,
-          amount: verifyResult.amount || 0,
+      try {
+        const failedSubmission = await this.prisma.paymentSubmission.create({
+          data: {
+            batchId: dto.batchId,
+            bank: dto.bank,
+            referenceNumber: normalizedRef,
+            participantPhone: dto.participantPhone,
+            participantName: dto.participantName || verifyResult.payerName,
+            amount: verifyResult.amount || 0,
+            status,
+            rejectionReason,
+            verifyEtRequestId: verifyResult.requestId,
+            verifyEtRawResponse: (verifyResult.raw as any) || {},
+            createdById: adminId,
+          },
+        });
+
+        return {
+          id: failedSubmission.id,
+          batchId: failedSubmission.batchId,
+          bank: failedSubmission.bank as BankType,
+          referenceNumber: failedSubmission.referenceNumber,
+          participantPhone: failedSubmission.participantPhone,
+          participantName: failedSubmission.participantName || undefined,
+          amount: failedSubmission.amount,
           status,
           rejectionReason,
+          tickets: [],
           verifyEtRequestId: verifyResult.requestId,
-          verifyEtRawResponse: (verifyResult.raw as any) || {},
-          createdById: adminId,
-        },
-      });
-
-      return {
-        id: failedSubmission.id,
-        batchId: failedSubmission.batchId,
-        bank: failedSubmission.bank as BankType,
-        referenceNumber: failedSubmission.referenceNumber,
-        participantPhone: failedSubmission.participantPhone,
-        participantName: failedSubmission.participantName || undefined,
-        amount: failedSubmission.amount,
-        status,
-        rejectionReason,
-        tickets: [],
-        verifyEtRequestId: verifyResult.requestId,
-        createdAt: failedSubmission.createdAt.toISOString(),
-      };
+          createdAt: failedSubmission.createdAt.toISOString(),
+        };
+      } catch (dbErr: any) {
+        if (dbErr?.code === 'P2002') {
+          this.logger.warn(`[Duplicate DB Record] Bank ${dto.bank} Ref ${normalizedRef} already recorded in DB.`);
+          return {
+            id: `dup-${Date.now()}`,
+            batchId: dto.batchId,
+            bank: dto.bank as BankType,
+            referenceNumber: normalizedRef,
+            participantPhone: dto.participantPhone,
+            participantName: dto.participantName,
+            amount: verifyResult.amount || 0,
+            status: 'DUPLICATE' as SubmissionStatus,
+            rejectionReason: 'Payment reference number has already been submitted to the system.',
+            tickets: [],
+            verifyEtRequestId: verifyResult.requestId,
+            createdAt: new Date().toISOString(),
+          };
+        }
+        throw dbErr;
+      }
     }
 
     // 6. Mandatory Check: Deposited price MUST be >= batch ticket price
@@ -274,6 +295,7 @@ export class PaymentSubmissionsService {
         createdAt: t.createdAt.toISOString(),
       })),
       verifyEtRequestId: s.verifyEtRequestId || undefined,
+      verifyEtRawResponse: s.verifyEtRawResponse || undefined,
       createdAt: s.createdAt.toISOString(),
     }));
   }

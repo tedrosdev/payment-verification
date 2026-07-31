@@ -20,14 +20,13 @@ export class VerifyEtService {
         'x-api-key': this.apiKey,
         'Content-Type': 'application/json',
       },
-      timeout: 15000,
+      timeout: 20000,
     });
   }
 
   /**
    * Verify a transaction reference via Verify.ET API (https://verify.et/docs/api).
-   * EVERY call makes an actual HTTPS POST request to ${VERIFY_ET_BASE_URL}/api/verify
-   * using the mandatory 'x-api-key' header.
+   * Supports HTTP 202 Queued polling loop and array payload normalization.
    */
   async verifyPayment(
     bank: string,
@@ -36,16 +35,18 @@ export class VerifyEtService {
     waitMs = 5000,
   ): Promise<VerifyEtNormalizedResult> {
     const formattedBank = bank.toLowerCase();
+    const cleanRef = referenceNumber.trim();
 
     const payload: Record<string, any> = {
       bank: formattedBank,
-      reference: referenceNumber.trim(),
-      waitMs,
+      referenceNumber: cleanRef,
+      reference: cleanRef,
     };
 
-    // Include accountSuffix for CBE and BOA if provided
+    // Include accountSuffix / suffix for CBE and BOA if provided
     if ((formattedBank === 'cbe' || formattedBank === 'boa') && accountSuffix) {
       payload.accountSuffix = accountSuffix.trim();
+      payload.suffix = accountSuffix.trim();
     }
 
     // Strict Check: Ensure VERIFY_ET_API_KEY is configured
@@ -62,9 +63,9 @@ export class VerifyEtService {
       };
     }
 
-    const requestUrl = `${this.baseUrl}/api/verify`;
+    const requestUrl = `${this.baseUrl}/api/verify?waitMs=${waitMs}`;
     const maskedKey = this.apiKey.length > 8 ? `${this.apiKey.substring(0, 4)}...${this.apiKey.substring(this.apiKey.length - 4)}` : '***';
-    const idempotencyKey = `verify-${referenceNumber.trim()}-${Date.now()}`;
+    const idempotencyKey = `verify-${cleanRef}-${Date.now()}`;
 
     const headers = {
       'x-api-key': this.apiKey,
@@ -82,14 +83,21 @@ export class VerifyEtService {
 
     const startTime = Date.now();
     try {
-      const response = await this.httpClient.post('/api/verify', payload, { headers });
+      const response = await this.httpClient.post(`/api/verify?waitMs=${waitMs}`, payload, { headers });
       const durationMs = Date.now() - startTime;
 
-      // Log full incoming HTTPS response details
       this.logger.log(`================================================================================`);
       this.logger.log(`[Verify.ET Response Incoming] HTTP ${response.status} (${durationMs}ms)`);
       this.logger.log(`[Verify.ET Response Data] ${JSON.stringify(response.data, null, 2)}`);
       this.logger.log(`================================================================================`);
+
+      // Handle 202 Queued Response by polling statusUrl until completion
+      if (response.status === 202 || response.data?.verification?.processingStatus === 'queued') {
+        const requestId = response.data?.requestId || response.data?.verification?.requestId;
+        if (requestId) {
+          return await this.pollVerificationUntilComplete(requestId, response.data);
+        }
+      }
 
       return this.normalizeResponse(response.data);
     } catch (error: any) {
@@ -112,6 +120,41 @@ export class VerifyEtService {
         raw: errorResponse,
       };
     }
+  }
+
+  /**
+   * Poll status endpoint GET /api/verify/:requestId when Verify.ET returns HTTP 202 Queued.
+   */
+  private async pollVerificationUntilComplete(requestId: string, initialResponse: any): Promise<VerifyEtNormalizedResult> {
+    const maxPollAttempts = 8;
+    const pollIntervalMs = initialResponse?.links?.pollAfterMs || 1500;
+
+    this.logger.log(`[Verify.ET Queue Poller] Starting status poll for requestId=${requestId} (interval: ${pollIntervalMs}ms)`);
+
+    for (let attempt = 1; attempt <= maxPollAttempts; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+
+      try {
+        const pollResponse = await this.httpClient.get(`/api/verify/${requestId}`, {
+          headers: { 'x-api-key': this.apiKey },
+        });
+
+        this.logger.log(`[Verify.ET Poll Attempt ${attempt}/${maxPollAttempts}] Status: ${pollResponse.data?.verification?.processingStatus || pollResponse.data?.processingStatus || 'running'}`);
+        this.logger.log(`[Verify.ET Poll Response Data] ${JSON.stringify(pollResponse.data, null, 2)}`);
+
+        const data = pollResponse.data;
+        const processingStatus = data?.verification?.processingStatus || data?.data?.processingStatus || data?.processingStatus;
+
+        if (processingStatus === 'completed' || processingStatus === 'success' || data?.data?.verified || data?.verification?.verified) {
+          return this.normalizeResponse(data);
+        }
+      } catch (pollErr: any) {
+        this.logger.error(`[Verify.ET Poll Error] Attempt ${attempt} failed: ${pollErr?.message}`);
+      }
+    }
+
+    // If max polling attempts reached without completion, return queued status
+    return this.normalizeResponse(initialResponse);
   }
 
   /**
@@ -153,6 +196,7 @@ export class VerifyEtService {
 
   /**
    * Normalizes raw response from Verify.ET into standardized internal domain result.
+   * Handles both object and array response envelopes per official docs.
    */
   normalizeResponse(rawResponse: any): VerifyEtNormalizedResult {
     if (!rawResponse || rawResponse.success === false) {
@@ -166,14 +210,26 @@ export class VerifyEtService {
       };
     }
 
-    const data = rawResponse.data || rawResponse;
-    const isVerified = Boolean(data.verified);
-    const settlementMatch = data.settlementAccountMatch?.matched ?? true;
-    const confirmedBefore = Boolean(data.confirmationHistory?.confirmedBefore);
+    // Extract item from data array or data object
+    let item: any = rawResponse;
+    if (Array.isArray(rawResponse.data) && rawResponse.data.length > 0) {
+      item = rawResponse.data[0];
+    } else if (rawResponse.data && typeof rawResponse.data === 'object') {
+      item = rawResponse.data;
+    }
+
+    const isVerified = Boolean(item.verified || rawResponse.verification?.verified);
+    const settlementMatch = item.settlementAccountMatch?.matched ?? true;
+    const confirmedBefore = Boolean(item.confirmationHistory?.confirmedBefore);
 
     let reason: string | undefined;
     if (!isVerified) {
-      reason = 'Payment transaction reference could not be verified with bank by Verify.ET';
+      const processingStatus = rawResponse.verification?.processingStatus || rawResponse.processingStatus;
+      if (processingStatus === 'queued' || processingStatus === 'pending') {
+        reason = `Payment verification queued/pending with bank (requestId: ${rawResponse.requestId})`;
+      } else {
+        reason = 'Payment transaction reference could not be verified with bank by Verify.ET';
+      }
     } else if (!settlementMatch) {
       reason = 'Payment settlement account does not match expected merchant account';
     } else if (confirmedBefore) {
@@ -182,10 +238,10 @@ export class VerifyEtService {
 
     return {
       verified: isVerified && settlementMatch && !confirmedBefore,
-      amount: Number(data.amount) || 0,
-      payerName: data.payerName || data.senderName,
-      requestId: rawResponse.requestId || data.requestId,
-      transactionTime: data.transactionTime,
+      amount: Number(item.amount) || Number(rawResponse.amount) || 0,
+      payerName: item.senderName || item.payerName || item.receiverName,
+      requestId: rawResponse.requestId || rawResponse.verification?.requestId || item.requestId,
+      transactionTime: item.timestamp || item.transactionTime,
       reason,
       settlementMatch,
       confirmedBefore,
