@@ -25,6 +25,7 @@ describe('PaymentSubmissionsService & Ticket Code Logic', () => {
     },
     ticket: {
       findFirst: jest.fn(),
+      create: jest.fn(),
       createMany: jest.fn(),
       findMany: jest.fn(),
       count: jest.fn(),

@@ -29,18 +29,18 @@ export class PaymentSubmissionsService {
       throw new BadRequestException(`Batch "${batch.name}" is currently ${batch.status}. Cannot process submissions.`);
     }
 
-    // 2. Local deduplication check (cheap check before calling external API)
+    // 2. Check for existing submission in database
     const existingSubmission = await this.prisma.paymentSubmission.findFirst({
       where: {
         bank: dto.bank,
         referenceNumber: normalizedRef,
-        status: 'VERIFIED',
       },
       include: { tickets: true },
     });
 
-    if (existingSubmission) {
-      this.logger.warn(`Duplicate submission attempt for ${dto.bank}:${normalizedRef}`);
+    // If already verified AND has tickets assigned, return DUPLICATE
+    if (existingSubmission && existingSubmission.status === 'VERIFIED' && existingSubmission.tickets.length > 0) {
+      this.logger.warn(`Duplicate submission attempt for already verified reference ${dto.bank}:${normalizedRef}`);
       return {
         id: existingSubmission.id,
         batchId: existingSubmission.batchId,
@@ -50,7 +50,7 @@ export class PaymentSubmissionsService {
         participantName: existingSubmission.participantName || undefined,
         amount: existingSubmission.amount,
         status: 'DUPLICATE' as SubmissionStatus,
-        rejectionReason: 'Payment reference number has already been verified and processed in the system.',
+        rejectionReason: 'Payment reference number has already been verified and ticket issued.',
         tickets: existingSubmission.tickets.map((t) => ({
           ...t,
           createdAt: t.createdAt.toISOString(),
@@ -66,32 +66,41 @@ export class PaymentSubmissionsService {
     });
 
     if (!settlementAccount || !settlementAccount.isActive) {
-      const rejectedSubmission = await this.prisma.paymentSubmission.create({
-        data: {
-          batchId: dto.batchId,
-          bank: dto.bank,
-          referenceNumber: normalizedRef,
-          participantPhone: dto.participantPhone,
-          participantName: dto.participantName,
-          amount: 0,
-          status: 'REJECTED',
-          rejectionReason: `No active settlement account configured for bank ${dto.bank}`,
-          createdById: adminId,
-        },
-      });
+      const rejectedRecord = existingSubmission
+        ? await this.prisma.paymentSubmission.update({
+            where: { id: existingSubmission.id },
+            data: {
+              batchId: dto.batchId,
+              status: 'REJECTED',
+              rejectionReason: `No active settlement account configured for bank ${dto.bank}`,
+            },
+          })
+        : await this.prisma.paymentSubmission.create({
+            data: {
+              batchId: dto.batchId,
+              bank: dto.bank,
+              referenceNumber: normalizedRef,
+              participantPhone: dto.participantPhone,
+              participantName: dto.participantName,
+              amount: 0,
+              status: 'REJECTED',
+              rejectionReason: `No active settlement account configured for bank ${dto.bank}`,
+              createdById: adminId,
+            },
+          });
 
       return {
-        id: rejectedSubmission.id,
-        batchId: rejectedSubmission.batchId,
-        bank: rejectedSubmission.bank as BankType,
-        referenceNumber: rejectedSubmission.referenceNumber,
-        participantPhone: rejectedSubmission.participantPhone,
-        participantName: rejectedSubmission.participantName || undefined,
+        id: rejectedRecord.id,
+        batchId: rejectedRecord.batchId,
+        bank: rejectedRecord.bank as BankType,
+        referenceNumber: rejectedRecord.referenceNumber,
+        participantPhone: rejectedRecord.participantPhone,
+        participantName: rejectedRecord.participantName || undefined,
         amount: 0,
         status: 'REJECTED' as SubmissionStatus,
-        rejectionReason: rejectedSubmission.rejectionReason || undefined,
+        rejectionReason: rejectedRecord.rejectionReason || undefined,
         tickets: [],
-        createdAt: rejectedSubmission.createdAt.toISOString(),
+        createdAt: rejectedRecord.createdAt.toISOString(),
       };
     }
 
@@ -107,57 +116,50 @@ export class PaymentSubmissionsService {
       const rejectionReason = verifyResult.reason || 'Verification failed';
       const status: SubmissionStatus = verifyResult.confirmedBefore ? 'DUPLICATE' : 'REJECTED';
 
-      try {
-        const failedSubmission = await this.prisma.paymentSubmission.create({
-          data: {
-            batchId: dto.batchId,
-            bank: dto.bank,
-            referenceNumber: normalizedRef,
-            participantPhone: dto.participantPhone,
-            participantName: dto.participantName || verifyResult.payerName,
-            amount: verifyResult.amount || 0,
-            status,
-            rejectionReason,
-            verifyEtRequestId: verifyResult.requestId,
-            verifyEtRawResponse: (verifyResult.raw as any) || {},
-            createdById: adminId,
-          },
-        });
+      const failedRecord = existingSubmission
+        ? await this.prisma.paymentSubmission.update({
+            where: { id: existingSubmission.id },
+            data: {
+              batchId: dto.batchId,
+              participantPhone: dto.participantPhone,
+              participantName: dto.participantName || verifyResult.payerName,
+              amount: verifyResult.amount || 0,
+              status,
+              rejectionReason,
+              verifyEtRequestId: verifyResult.requestId,
+              verifyEtRawResponse: (verifyResult.raw as any) || {},
+            },
+          })
+        : await this.prisma.paymentSubmission.create({
+            data: {
+              batchId: dto.batchId,
+              bank: dto.bank,
+              referenceNumber: normalizedRef,
+              participantPhone: dto.participantPhone,
+              participantName: dto.participantName || verifyResult.payerName,
+              amount: verifyResult.amount || 0,
+              status,
+              rejectionReason,
+              verifyEtRequestId: verifyResult.requestId,
+              verifyEtRawResponse: (verifyResult.raw as any) || {},
+              createdById: adminId,
+            },
+          });
 
-        return {
-          id: failedSubmission.id,
-          batchId: failedSubmission.batchId,
-          bank: failedSubmission.bank as BankType,
-          referenceNumber: failedSubmission.referenceNumber,
-          participantPhone: failedSubmission.participantPhone,
-          participantName: failedSubmission.participantName || undefined,
-          amount: failedSubmission.amount,
-          status,
-          rejectionReason,
-          tickets: [],
-          verifyEtRequestId: verifyResult.requestId,
-          createdAt: failedSubmission.createdAt.toISOString(),
-        };
-      } catch (dbErr: any) {
-        if (dbErr?.code === 'P2002') {
-          this.logger.warn(`[Duplicate DB Record] Bank ${dto.bank} Ref ${normalizedRef} already recorded in DB.`);
-          return {
-            id: `dup-${Date.now()}`,
-            batchId: dto.batchId,
-            bank: dto.bank as BankType,
-            referenceNumber: normalizedRef,
-            participantPhone: dto.participantPhone,
-            participantName: dto.participantName,
-            amount: verifyResult.amount || 0,
-            status: 'DUPLICATE' as SubmissionStatus,
-            rejectionReason: 'Payment reference number has already been submitted to the system.',
-            tickets: [],
-            verifyEtRequestId: verifyResult.requestId,
-            createdAt: new Date().toISOString(),
-          };
-        }
-        throw dbErr;
-      }
+      return {
+        id: failedRecord.id,
+        batchId: failedRecord.batchId,
+        bank: failedRecord.bank as BankType,
+        referenceNumber: failedRecord.referenceNumber,
+        participantPhone: failedRecord.participantPhone,
+        participantName: failedRecord.participantName || undefined,
+        amount: failedRecord.amount,
+        status,
+        rejectionReason,
+        tickets: [],
+        verifyEtRequestId: verifyResult.requestId,
+        createdAt: failedRecord.createdAt.toISOString(),
+      };
     }
 
     // 6. Mandatory Check: Deposited price MUST be >= batch ticket price
@@ -166,82 +168,102 @@ export class PaymentSubmissionsService {
         `[Insufficient Payment] Deposited amount (${verifyResult.amount} ETB) is less than required batch ticket price (${batch.ticketPrice} ETB) for batch ${batch.name}`,
       );
 
-      const rejectedSubmission = await this.prisma.paymentSubmission.create({
-        data: {
-          batchId: dto.batchId,
-          bank: dto.bank,
-          referenceNumber: normalizedRef,
-          participantPhone: dto.participantPhone,
-          participantName: dto.participantName || verifyResult.payerName,
-          amount: verifyResult.amount,
-          status: 'REJECTED',
-          rejectionReason: `Payment deposited amount (${verifyResult.amount} ETB) is less than required batch ticket price (${batch.ticketPrice} ETB)`,
-          verifyEtRequestId: verifyResult.requestId,
-          verifyEtRawResponse: (verifyResult.raw as any) || {},
-          createdById: adminId,
-        },
-      });
+      const rejectedRecord = existingSubmission
+        ? await this.prisma.paymentSubmission.update({
+            where: { id: existingSubmission.id },
+            data: {
+              batchId: dto.batchId,
+              participantPhone: dto.participantPhone,
+              participantName: dto.participantName || verifyResult.payerName,
+              amount: verifyResult.amount,
+              status: 'REJECTED',
+              rejectionReason: `Payment deposited amount (${verifyResult.amount} ETB) is less than required batch ticket price (${batch.ticketPrice} ETB)`,
+              verifyEtRequestId: verifyResult.requestId,
+              verifyEtRawResponse: (verifyResult.raw as any) || {},
+            },
+          })
+        : await this.prisma.paymentSubmission.create({
+            data: {
+              batchId: dto.batchId,
+              bank: dto.bank,
+              referenceNumber: normalizedRef,
+              participantPhone: dto.participantPhone,
+              participantName: dto.participantName || verifyResult.payerName,
+              amount: verifyResult.amount,
+              status: 'REJECTED',
+              rejectionReason: `Payment deposited amount (${verifyResult.amount} ETB) is less than required batch ticket price (${batch.ticketPrice} ETB)`,
+              verifyEtRequestId: verifyResult.requestId,
+              verifyEtRawResponse: (verifyResult.raw as any) || {},
+              createdById: adminId,
+            },
+          });
 
       return {
-        id: rejectedSubmission.id,
-        batchId: rejectedSubmission.batchId,
-        bank: rejectedSubmission.bank as BankType,
-        referenceNumber: rejectedSubmission.referenceNumber,
-        participantPhone: rejectedSubmission.participantPhone,
-        participantName: rejectedSubmission.participantName || undefined,
+        id: rejectedRecord.id,
+        batchId: rejectedRecord.batchId,
+        bank: rejectedRecord.bank as BankType,
+        referenceNumber: rejectedRecord.referenceNumber,
+        participantPhone: rejectedRecord.participantPhone,
+        participantName: rejectedRecord.participantName || undefined,
         amount: verifyResult.amount,
         status: 'REJECTED' as SubmissionStatus,
-        rejectionReason: rejectedSubmission.rejectionReason || undefined,
+        rejectionReason: rejectedRecord.rejectionReason || undefined,
         tickets: [],
         verifyEtRequestId: verifyResult.requestId,
-        createdAt: rejectedSubmission.createdAt.toISOString(),
+        createdAt: rejectedRecord.createdAt.toISOString(),
       };
     }
 
-    // 7. Atomic transaction: create submission & issue tickets
+    // 7. Success Branch: Atomic transaction to update/create submission & issue 1 ticket
     return this.prisma.$transaction(async (tx) => {
-      // Find current max ticket number for batch
       const maxTicket = await tx.ticket.findFirst({
         where: { batchId: dto.batchId },
         orderBy: { ticketNumber: 'desc' },
         select: { ticketNumber: true },
       });
 
-      let startTicketNum = (maxTicket?.ticketNumber || 0) + 1;
+      const nextTicketNum = (maxTicket?.ticketNumber || 0) + 1;
 
-      const submission = await tx.paymentSubmission.create({
+      const submission = existingSubmission
+        ? await tx.paymentSubmission.update({
+            where: { id: existingSubmission.id },
+            data: {
+              batchId: dto.batchId,
+              participantPhone: dto.participantPhone,
+              participantName: dto.participantName || verifyResult.payerName,
+              amount: verifyResult.amount,
+              status: 'VERIFIED',
+              rejectionReason: null,
+              verifyEtRequestId: verifyResult.requestId,
+              verifyEtRawResponse: (verifyResult.raw as any) || {},
+            },
+          })
+        : await tx.paymentSubmission.create({
+            data: {
+              batchId: dto.batchId,
+              bank: dto.bank,
+              referenceNumber: normalizedRef,
+              participantPhone: dto.participantPhone,
+              participantName: dto.participantName || verifyResult.payerName,
+              amount: verifyResult.amount,
+              status: 'VERIFIED',
+              verifyEtRequestId: verifyResult.requestId,
+              verifyEtRawResponse: (verifyResult.raw as any) || {},
+              createdById: adminId,
+            },
+          });
+
+      const code = generateTicketCode(nextTicketNum);
+
+      await tx.ticket.create({
         data: {
-          batchId: dto.batchId,
-          bank: dto.bank,
-          referenceNumber: normalizedRef,
-          participantPhone: dto.participantPhone,
-          participantName: dto.participantName || verifyResult.payerName,
-          amount: verifyResult.amount,
-          status: 'VERIFIED',
-          verifyEtRequestId: verifyResult.requestId,
-          verifyEtRawResponse: (verifyResult.raw as any) || {},
-          createdById: adminId,
-        },
-      });
-
-      const ticketCount = 1;
-      const ticketsToCreate = [];
-      for (let i = 0; i < ticketCount; i++) {
-        const ticketNum = startTicketNum + i;
-        const code = generateTicketCode(ticketNum);
-
-        ticketsToCreate.push({
           batchId: dto.batchId,
           submissionId: submission.id,
           code,
-          ticketNumber: ticketNum,
+          ticketNumber: nextTicketNum,
           participantPhone: dto.participantPhone,
           participantName: dto.participantName || verifyResult.payerName,
-        });
-      }
-
-      await tx.ticket.createMany({
-        data: ticketsToCreate,
+        },
       });
 
       const createdTickets = await tx.ticket.findMany({
