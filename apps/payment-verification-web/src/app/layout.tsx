@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { Navigation } from '@/components/Navigation';
+import { AuthGuard } from '@/components/AuthGuard';
 
 export const metadata: Metadata = {
   title: 'Payment Verification & Ticketing Admin',
@@ -15,8 +16,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <Navigation />
-        <main className="main-layout">{children}</main>
+        <AuthGuard>
+          <Navigation />
+          <main className="main-layout">{children}</main>
+        </AuthGuard>
       </body>
     </html>
   );

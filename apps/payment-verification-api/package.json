@@ -25,6 +25,8 @@
     "@nestjs/jwt": "^10.2.0",
     "@nestjs/passport": "^10.0.3",
     "@nestjs/platform-express": "^10.3.0",
+    "@nestjs/swagger": "^7.3.0",
+    "swagger-ui-express": "^5.0.0",
     "@payment-verification/config": "workspace:*",
     "@payment-verification/types": "workspace:*",
     "@prisma/client": "^5.14.0",
