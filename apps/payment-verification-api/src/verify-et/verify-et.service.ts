@@ -17,7 +17,7 @@ export class VerifyEtService {
     this.httpClient = axios.create({
       baseURL: this.baseUrl,
       headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
+        'x-api-key': this.apiKey,
         'Content-Type': 'application/json',
       },
       timeout: 15000,
@@ -26,7 +26,8 @@ export class VerifyEtService {
 
   /**
    * Verify a transaction reference via Verify.ET API (https://verify.et/docs/api).
-   * EVERY call makes an actual HTTPS POST request to ${VERIFY_ET_BASE_URL}/api/verify.
+   * EVERY call makes an actual HTTPS POST request to ${VERIFY_ET_BASE_URL}/api/verify
+   * using the mandatory 'x-api-key' header.
    */
   async verifyPayment(
     bank: string,
@@ -63,17 +64,25 @@ export class VerifyEtService {
 
     const requestUrl = `${this.baseUrl}/api/verify`;
     const maskedKey = this.apiKey.length > 8 ? `${this.apiKey.substring(0, 4)}...${this.apiKey.substring(this.apiKey.length - 4)}` : '***';
+    const idempotencyKey = `verify-${referenceNumber.trim()}-${Date.now()}`;
 
-    // Log full outgoing HTTPS request details to console & server logs
+    const headers = {
+      'x-api-key': this.apiKey,
+      'Content-Type': 'application/json',
+      'Idempotency-Key': idempotencyKey,
+    };
+
+    // Log full outgoing HTTPS request details per Verify.ET API documentation
     this.logger.log(`================================================================================`);
     this.logger.log(`[Verify.ET Request Outgoing] POST ${requestUrl}`);
-    this.logger.log(`[Verify.ET Request Headers] Authorization: Bearer ${maskedKey}`);
+    this.logger.log(`[Verify.ET Request Headers] x-api-key: ${maskedKey}`);
+    this.logger.log(`[Verify.ET Request Headers] Idempotency-Key: ${idempotencyKey}`);
     this.logger.log(`[Verify.ET Request Payload] ${JSON.stringify(payload, null, 2)}`);
     this.logger.log(`================================================================================`);
 
     const startTime = Date.now();
     try {
-      const response = await this.httpClient.post('/api/verify', payload);
+      const response = await this.httpClient.post('/api/verify', payload, { headers });
       const durationMs = Date.now() - startTime;
 
       // Log full incoming HTTPS response details
@@ -124,7 +133,9 @@ export class VerifyEtService {
     this.logger.log(`[Verify.ET Request Status] GET ${requestUrl}`);
 
     try {
-      const response = await this.httpClient.get(`/api/verify/${requestId}`);
+      const response = await this.httpClient.get(`/api/verify/${requestId}`, {
+        headers: { 'x-api-key': this.apiKey },
+      });
       this.logger.log(`[Verify.ET Response Status Data] ${JSON.stringify(response.data, null, 2)}`);
       return this.normalizeResponse(response.data);
     } catch (error: any) {
