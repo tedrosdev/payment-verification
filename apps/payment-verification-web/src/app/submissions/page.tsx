@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useEffect, useState } from 'react';
 import { fetchApi } from '@/lib/api';
 import { SubmissionResponseDto, SubmissionStatus } from '@payment-verification/types';

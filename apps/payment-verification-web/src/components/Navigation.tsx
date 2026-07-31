@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { clearStoredToken } from '@/lib/api';
-import { ShieldCheck, LayoutDashboard, Layers, CheckCircle2, Ticket, CreditCard, LogOut } from 'lucide-react';
+import { ShieldCheck, LayoutDashboard, Layers, CheckCircle2, Ticket, CreditCard, Terminal, LogOut } from 'lucide-react';
 
 export function Navigation() {
   const pathname = usePathname();
@@ -22,6 +22,7 @@ export function Navigation() {
     { href: '/batches', label: 'Batches', icon: Layers },
     { href: '/settlement-accounts', label: 'Settlement Config', icon: CreditCard },
     { href: '/submissions', label: 'Submissions', icon: ShieldCheck },
+    { href: '/api-logs', label: 'API Logs', icon: Terminal },
     { href: '/tickets', label: 'Tickets', icon: Ticket },
   ];
 
