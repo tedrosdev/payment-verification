@@ -14,6 +14,12 @@ import { TicketsModule } from './tickets/tickets.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: [
+        'apps/payment-verification-api/.env',
+        '.env',
+        'apps/payment-verification-api/.env.local',
+        '.env.local',
+      ],
     }),
     PrismaModule,
     AuthModule,
