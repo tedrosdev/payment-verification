@@ -1,0 +1,104 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AdminRole {
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum BankType {
+  CBE
+  TELEBIRR
+  BOA
+}
+
+enum BatchStatus {
+  ACTIVE
+  CLOSED
+  ARCHIVED
+}
+
+enum SubmissionStatus {
+  VERIFIED
+  REJECTED
+  DUPLICATE
+  NEEDS_REVIEW
+}
+
+model Admin {
+  id           String              @id @default(uuid())
+  email        String              @unique
+  passwordHash String
+  name         String
+  role         AdminRole           @default(ADMIN)
+  submissions  PaymentSubmission[]
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+}
+
+model SettlementAccount {
+  id                String   @id @default(uuid())
+  bank              BankType @unique
+  accountNumber     String
+  accountSuffix     String?
+  accountHolderName String?
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model Batch {
+  id          String              @id @default(uuid())
+  name        String
+  ticketPrice Float
+  status      BatchStatus         @default(ACTIVE)
+  description String?
+  submissions PaymentSubmission[]
+  tickets     Ticket[]
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+}
+
+model PaymentSubmission {
+  id                  String           @id @default(uuid())
+  batchId             String
+  batch               Batch            @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  bank                BankType
+  referenceNumber     String
+  participantPhone    String
+  participantName     String?
+  amount              Float
+  status              SubmissionStatus
+  rejectionReason     String?
+  verifyEtRequestId   String?
+  verifyEtRawResponse Json?
+  createdById         String
+  createdBy           Admin            @relation(fields: [createdById], references: [id])
+  tickets             Ticket[]
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  @@unique([bank, referenceNumber])
+}
+
+model Ticket {
+  id               String            @id @default(uuid())
+  batchId          String
+  batch            Batch             @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  submissionId     String
+  submission       PaymentSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  code             String
+  ticketNumber     Int
+  participantPhone String
+  participantName  String?
+  createdAt        DateTime          @default(now())
+
+  @@unique([batchId, code])
+  @@unique([batchId, ticketNumber])
+}
