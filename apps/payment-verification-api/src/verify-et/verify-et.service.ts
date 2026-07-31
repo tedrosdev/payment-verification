@@ -20,13 +20,13 @@ export class VerifyEtService {
         'Authorization': `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json',
       },
-      timeout: 10000,
+      timeout: 15000,
     });
   }
 
   /**
-   * Verify a transaction reference via Verify.ET API.
-   * Handles bank-specific payload normalization (CBE/BOA need accountSuffix, Telebirr does not).
+   * Verify a transaction reference via Verify.ET API (https://verify.et/docs/api).
+   * EVERY call makes an actual HTTPS POST request to ${VERIFY_ET_BASE_URL}/api/verify.
    */
   async verifyPayment(
     bank: string,
@@ -44,36 +44,55 @@ export class VerifyEtService {
 
     // Include accountSuffix for CBE and BOA if provided
     if ((formattedBank === 'cbe' || formattedBank === 'boa') && accountSuffix) {
-      payload.accountSuffix = accountSuffix;
+      payload.accountSuffix = accountSuffix.trim();
     }
 
-    // In local development or mock mode without real Verify.ET API key
-    if (!this.apiKey || this.apiKey === 'mock-verify-et-api-key') {
-      this.logger.warn(`[Verify.ET Mock Mode] Processing verification locally for bank=${bank}, ref=${referenceNumber}`);
-      return this.handleMockVerification(bank, referenceNumber, accountSuffix);
+    // Strict Check: Ensure VERIFY_ET_API_KEY is configured
+    if (!this.apiKey || this.apiKey === 'mock-verify-et-api-key' || this.apiKey === 'YOUR_API_KEY_HERE') {
+      const errorMsg = `VERIFY_ET_API_KEY is missing or unconfigured in .env file. Real deposit verification cannot proceed.`;
+      this.logger.error(`[Verify.ET Error] ${errorMsg}`);
+      return {
+        verified: false,
+        amount: 0,
+        reason: errorMsg,
+        settlementMatch: false,
+        confirmedBefore: false,
+        raw: { error: errorMsg, apiKeyConfigured: false },
+      };
     }
 
-    // Log outgoing HTTPS request to Verify.ET API
-    this.logger.log(`[Verify.ET Request Outgoing] POST ${this.baseUrl}/api/verify`);
+    const requestUrl = `${this.baseUrl}/api/verify`;
+    const maskedKey = this.apiKey.length > 8 ? `${this.apiKey.substring(0, 4)}...${this.apiKey.substring(this.apiKey.length - 4)}` : '***';
+
+    // Log full outgoing HTTPS request details to console & server logs
+    this.logger.log(`================================================================================`);
+    this.logger.log(`[Verify.ET Request Outgoing] POST ${requestUrl}`);
+    this.logger.log(`[Verify.ET Request Headers] Authorization: Bearer ${maskedKey}`);
     this.logger.log(`[Verify.ET Request Payload] ${JSON.stringify(payload, null, 2)}`);
+    this.logger.log(`================================================================================`);
 
     const startTime = Date.now();
     try {
       const response = await this.httpClient.post('/api/verify', payload);
       const durationMs = Date.now() - startTime;
 
+      // Log full incoming HTTPS response details
+      this.logger.log(`================================================================================`);
       this.logger.log(`[Verify.ET Response Incoming] HTTP ${response.status} (${durationMs}ms)`);
-      this.logger.log(`[Verify.ET Response Body] ${JSON.stringify(response.data, null, 2)}`);
+      this.logger.log(`[Verify.ET Response Data] ${JSON.stringify(response.data, null, 2)}`);
+      this.logger.log(`================================================================================`);
 
       return this.normalizeResponse(response.data);
     } catch (error: any) {
       const durationMs = Date.now() - startTime;
-      const errorResponse = error?.response?.data || { message: error?.message };
+      const errorResponse = error?.response?.data || { message: error?.message || 'Network/Server Error' };
 
+      this.logger.error(`================================================================================`);
       this.logger.error(
         `[Verify.ET Response Error] HTTP ${error?.response?.status || 500} (${durationMs}ms): ${error?.message}`,
-        JSON.stringify(errorResponse, null, 2),
       );
+      this.logger.error(`[Verify.ET Response Error Body] ${JSON.stringify(errorResponse, null, 2)}`);
+      this.logger.error(`================================================================================`);
 
       return {
         verified: false,
@@ -92,21 +111,24 @@ export class VerifyEtService {
   async getVerificationStatus(requestId: string): Promise<VerifyEtNormalizedResult> {
     if (!this.apiKey || this.apiKey === 'mock-verify-et-api-key') {
       return {
-        verified: true,
-        amount: 100,
+        verified: false,
+        amount: 0,
         requestId,
-        settlementMatch: true,
+        reason: 'VERIFY_ET_API_KEY not configured',
+        settlementMatch: false,
         confirmedBefore: false,
       };
     }
 
-    this.logger.log(`[Verify.ET Request Status] GET ${this.baseUrl}/api/verify/${requestId}`);
+    const requestUrl = `${this.baseUrl}/api/verify/${requestId}`;
+    this.logger.log(`[Verify.ET Request Status] GET ${requestUrl}`);
+
     try {
       const response = await this.httpClient.get(`/api/verify/${requestId}`);
-      this.logger.log(`[Verify.ET Response Status Body] ${JSON.stringify(response.data, null, 2)}`);
+      this.logger.log(`[Verify.ET Response Status Data] ${JSON.stringify(response.data, null, 2)}`);
       return this.normalizeResponse(response.data);
     } catch (error: any) {
-      this.logger.error(`[Verify.ET Status Error] GET /api/verify/${requestId}: ${error?.message}`);
+      this.logger.error(`[Verify.ET Status Error] GET ${requestUrl}: ${error?.message}`);
       return {
         verified: false,
         amount: 0,
@@ -140,7 +162,7 @@ export class VerifyEtService {
 
     let reason: string | undefined;
     if (!isVerified) {
-      reason = 'Payment transaction could not be verified with bank';
+      reason = 'Payment transaction reference could not be verified with bank by Verify.ET';
     } else if (!settlementMatch) {
       reason = 'Payment settlement account does not match expected merchant account';
     } else if (confirmedBefore) {
@@ -157,59 +179,6 @@ export class VerifyEtService {
       settlementMatch,
       confirmedBefore,
       raw: rawResponse,
-    };
-  }
-
-  /**
-   * Mock fallback generator for test/dev environments (when no real API key is configured).
-   */
-  private handleMockVerification(
-    bank: string,
-    referenceNumber: string,
-    accountSuffix?: string,
-  ): VerifyEtNormalizedResult {
-    const refUpper = referenceNumber.toUpperCase();
-
-    if (refUpper.includes('INVALID') || refUpper.includes('FAIL')) {
-      return {
-        verified: false,
-        amount: 0,
-        reason: 'Payment reference number is invalid or not found',
-        settlementMatch: false,
-        confirmedBefore: false,
-      };
-    }
-
-    if (refUpper.includes('MISMATCH')) {
-      return {
-        verified: false,
-        amount: 0,
-        reason: 'Payment settlement account does not match expected merchant account',
-        settlementMatch: false,
-        confirmedBefore: false,
-      };
-    }
-
-    if (refUpper.includes('USED') || refUpper.includes('DUP')) {
-      return {
-        verified: false,
-        amount: 0,
-        reason: 'Payment reference number has already been confirmed/claimed previously',
-        settlementMatch: true,
-        confirmedBefore: true,
-      };
-    }
-
-    // Default mock success (no hardcoded 500 ETB - uses 100 ETB standard batch price test default)
-    return {
-      verified: true,
-      amount: 100,
-      payerName: 'Sample Customer',
-      requestId: `mock_req_${Date.now()}`,
-      transactionTime: new Date().toISOString(),
-      settlementMatch: true,
-      confirmedBefore: false,
-      raw: { mock: true, bank, referenceNumber, accountSuffix },
     };
   }
 }
