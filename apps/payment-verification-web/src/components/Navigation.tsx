@@ -20,6 +20,7 @@ export function Navigation() {
     { href: '/', label: 'Overview', icon: LayoutDashboard },
     { href: '/verify', label: 'Verify Payment', icon: CheckCircle2 },
     { href: '/batches', label: 'Batches', icon: Layers },
+    { href: '/settlement-accounts', label: 'Settlement Config', icon: CreditCard },
     { href: '/submissions', label: 'Submissions', icon: ShieldCheck },
     { href: '/tickets', label: 'Tickets', icon: Ticket },
   ];
