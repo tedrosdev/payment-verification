@@ -139,8 +139,8 @@ export class PaymentSubmissionsService {
       };
     }
 
-    // 6. Calculate tickets to issue based on ticketPrice math
-    const ticketCount = Math.floor(verifyResult.amount / batch.ticketPrice);
+    // 6. Issue exactly 1 ticket code per verified payment reference
+    const ticketCount = 1;
 
     if (ticketCount < 1) {
       const rejectedSubmission = await this.prisma.paymentSubmission.create({

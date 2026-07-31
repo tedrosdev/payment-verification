@@ -136,11 +136,9 @@ describe('PaymentSubmissionsService & Ticket Code Logic', () => {
         createdAt: new Date(),
       });
 
-      mockPrisma.ticket.createMany.mockResolvedValue({ count: 3 });
+      mockPrisma.ticket.createMany.mockResolvedValue({ count: 1 });
       mockPrisma.ticket.findMany.mockResolvedValue([
         { id: 't1', code: 'AA01', ticketNumber: 1, createdAt: new Date() },
-        { id: 't2', code: 'AA02', ticketNumber: 2, createdAt: new Date() },
-        { id: 't3', code: 'AA03', ticketNumber: 3, createdAt: new Date() },
       ]);
 
       const result = await service.submitAndVerify(
@@ -154,9 +152,8 @@ describe('PaymentSubmissionsService & Ticket Code Logic', () => {
       );
 
       expect(result.status).toBe('VERIFIED');
-      expect(result.tickets.length).toBe(3);
+      expect(result.tickets.length).toBe(1);
       expect(result.tickets[0].code).toBe('AA01');
-      expect(result.tickets[2].code).toBe('AA03');
     });
   });
 });
