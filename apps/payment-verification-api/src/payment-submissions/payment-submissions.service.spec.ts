@@ -155,5 +155,59 @@ describe('PaymentSubmissionsService & Ticket Code Logic', () => {
       expect(result.tickets.length).toBe(1);
       expect(result.tickets[0].code).toBe('AA01');
     });
+
+    it('should reject submission if deposited amount is less than batch ticket price', async () => {
+      mockPrisma.batch.findUnique.mockResolvedValue({
+        id: 'batch-1',
+        name: 'Test Batch',
+        ticketPrice: 200,
+        status: 'ACTIVE',
+      });
+
+      mockPrisma.paymentSubmission.findFirst.mockResolvedValue(null);
+      mockPrisma.settlementAccount.findUnique.mockResolvedValue({
+        bank: 'CBE',
+        accountNumber: '1000123',
+        accountSuffix: '0123',
+        isActive: true,
+      });
+
+      mockVerifyEtService.verifyPayment.mockResolvedValue({
+        verified: true,
+        amount: 50, // 50 ETB < 200 ETB required
+        payerName: 'Jane Doe',
+        requestId: 'req-200',
+        settlementMatch: true,
+        confirmedBefore: false,
+      });
+
+      mockPrisma.paymentSubmission.create.mockResolvedValue({
+        id: 'sub-rejected',
+        batchId: 'batch-1',
+        bank: 'CBE',
+        referenceNumber: 'FT50',
+        participantPhone: '0911223344',
+        participantName: 'Jane Doe',
+        amount: 50,
+        status: 'REJECTED' as const,
+        rejectionReason: 'Payment deposited amount (50 ETB) is less than required batch ticket price (200 ETB)',
+        verifyEtRequestId: 'req-200',
+        createdAt: new Date(),
+      });
+
+      const result = await service.submitAndVerify(
+        {
+          batchId: 'batch-1',
+          bank: 'CBE' as const,
+          referenceNumber: 'FT50',
+          participantPhone: '0911223344',
+        },
+        'admin-1',
+      );
+
+      expect(result.status).toBe('REJECTED');
+      expect(result.tickets.length).toBe(0);
+      expect((result as any).rejectionReason).toContain('less than required batch ticket price');
+    });
   });
 });

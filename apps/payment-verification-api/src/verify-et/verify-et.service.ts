@@ -49,22 +49,39 @@ export class VerifyEtService {
 
     // In local development or mock mode without real Verify.ET API key
     if (!this.apiKey || this.apiKey === 'mock-verify-et-api-key') {
+      this.logger.warn(`[Verify.ET Mock Mode] Processing verification locally for bank=${bank}, ref=${referenceNumber}`);
       return this.handleMockVerification(bank, referenceNumber, accountSuffix);
     }
 
+    // Log outgoing HTTPS request to Verify.ET API
+    this.logger.log(`[Verify.ET Request Outgoing] POST ${this.baseUrl}/api/verify`);
+    this.logger.log(`[Verify.ET Request Payload] ${JSON.stringify(payload, null, 2)}`);
+
+    const startTime = Date.now();
     try {
       const response = await this.httpClient.post('/api/verify', payload);
+      const durationMs = Date.now() - startTime;
+
+      this.logger.log(`[Verify.ET Response Incoming] HTTP ${response.status} (${durationMs}ms)`);
+      this.logger.log(`[Verify.ET Response Body] ${JSON.stringify(response.data, null, 2)}`);
+
       return this.normalizeResponse(response.data);
     } catch (error: any) {
-      this.logger.error(`Verify.ET API call failed: ${error?.message}`, error?.response?.data);
+      const durationMs = Date.now() - startTime;
+      const errorResponse = error?.response?.data || { message: error?.message };
+
+      this.logger.error(
+        `[Verify.ET Response Error] HTTP ${error?.response?.status || 500} (${durationMs}ms): ${error?.message}`,
+        JSON.stringify(errorResponse, null, 2),
+      );
 
       return {
         verified: false,
         amount: 0,
-        reason: error?.response?.data?.message || error?.message || 'Verification service communication error',
+        reason: errorResponse?.message || errorResponse?.error || error?.message || 'Verification service communication error',
         settlementMatch: false,
         confirmedBefore: false,
-        raw: error?.response?.data || { error: error?.message },
+        raw: errorResponse,
       };
     }
   }
@@ -76,17 +93,20 @@ export class VerifyEtService {
     if (!this.apiKey || this.apiKey === 'mock-verify-et-api-key') {
       return {
         verified: true,
-        amount: 500,
+        amount: 100,
         requestId,
         settlementMatch: true,
         confirmedBefore: false,
       };
     }
 
+    this.logger.log(`[Verify.ET Request Status] GET ${this.baseUrl}/api/verify/${requestId}`);
     try {
       const response = await this.httpClient.get(`/api/verify/${requestId}`);
+      this.logger.log(`[Verify.ET Response Status Body] ${JSON.stringify(response.data, null, 2)}`);
       return this.normalizeResponse(response.data);
     } catch (error: any) {
+      this.logger.error(`[Verify.ET Status Error] GET /api/verify/${requestId}: ${error?.message}`);
       return {
         verified: false,
         amount: 0,
@@ -141,7 +161,7 @@ export class VerifyEtService {
   }
 
   /**
-   * Mock fallback generator for test/dev environments.
+   * Mock fallback generator for test/dev environments (when no real API key is configured).
    */
   private handleMockVerification(
     bank: string,
@@ -163,7 +183,7 @@ export class VerifyEtService {
     if (refUpper.includes('MISMATCH')) {
       return {
         verified: false,
-        amount: 500,
+        amount: 0,
         reason: 'Payment settlement account does not match expected merchant account',
         settlementMatch: false,
         confirmedBefore: false,
@@ -173,17 +193,17 @@ export class VerifyEtService {
     if (refUpper.includes('USED') || refUpper.includes('DUP')) {
       return {
         verified: false,
-        amount: 500,
+        amount: 0,
         reason: 'Payment reference number has already been confirmed/claimed previously',
         settlementMatch: true,
         confirmedBefore: true,
       };
     }
 
-    // Default mock success (e.g. 500 ETB for standard reference numbers)
+    // Default mock success (no hardcoded 500 ETB - uses 100 ETB standard batch price test default)
     return {
       verified: true,
-      amount: 500,
+      amount: 100,
       payerName: 'Sample Customer',
       requestId: `mock_req_${Date.now()}`,
       transactionTime: new Date().toISOString(),

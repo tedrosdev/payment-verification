@@ -139,10 +139,12 @@ export class PaymentSubmissionsService {
       };
     }
 
-    // 6. Issue exactly 1 ticket code per verified payment reference
-    const ticketCount = 1;
+    // 6. Mandatory Check: Deposited price MUST be >= batch ticket price
+    if (verifyResult.amount < batch.ticketPrice) {
+      this.logger.warn(
+        `[Insufficient Payment] Deposited amount (${verifyResult.amount} ETB) is less than required batch ticket price (${batch.ticketPrice} ETB) for batch ${batch.name}`,
+      );
 
-    if (ticketCount < 1) {
       const rejectedSubmission = await this.prisma.paymentSubmission.create({
         data: {
           batchId: dto.batchId,
@@ -152,7 +154,7 @@ export class PaymentSubmissionsService {
           participantName: dto.participantName || verifyResult.payerName,
           amount: verifyResult.amount,
           status: 'REJECTED',
-          rejectionReason: `Payment amount (${verifyResult.amount} ETB) is less than batch ticket price (${batch.ticketPrice} ETB)`,
+          rejectionReason: `Payment deposited amount (${verifyResult.amount} ETB) is less than required batch ticket price (${batch.ticketPrice} ETB)`,
           verifyEtRequestId: verifyResult.requestId,
           verifyEtRawResponse: (verifyResult.raw as any) || {},
           createdById: adminId,
@@ -201,6 +203,7 @@ export class PaymentSubmissionsService {
         },
       });
 
+      const ticketCount = 1;
       const ticketsToCreate = [];
       for (let i = 0; i < ticketCount; i++) {
         const ticketNum = startTicketNum + i;
