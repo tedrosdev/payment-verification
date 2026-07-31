@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const apiEnvSchema = z.object({
   PORT: z.string().default('3001'),
-  DATABASE_URL: z.string().default('postgresql://postgres:postgres@localhost:5432/payment_verification?schema=public'),
+  DATABASE_URL: z.string().default('postgresql://postgres:postgrespassword@localhost:5433/payment_verification?schema=public'),
   JWT_ACCESS_SECRET: z.string().default('super-secret-access-token-key-change-in-prod'),
   JWT_REFRESH_SECRET: z.string().default('super-secret-refresh-token-key-change-in-prod'),
   JWT_EXPIRES_IN: z.string().default('1d'),

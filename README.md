@@ -18,15 +18,13 @@ A monorepo payment-verification ticketing system. Admin manually enters payment 
 
 - Node.js >= 20.0.0
 - pnpm >= 9.0.0
-- Docker & Docker Compose (for running local PostgreSQL or full stack)
+- Docker & Docker Compose
 
 ---
 
 ### Method 1: Local Development Mode (Recommended)
 
-Run the apps locally with hot-reloading:
-
-#### 1. Start Local PostgreSQL Database
+#### 1. Start Local PostgreSQL Database (Port 5433 to avoid host 5432 conflicts)
 ```bash
 docker compose up -d postgres
 ```
@@ -49,6 +47,7 @@ pnpm dev
 #### Service URLs:
 - **Next.js Web Admin Dashboard**: `http://localhost:3000`
 - **NestJS API**: `http://localhost:3001/api/v1`
+- **Swagger Documentation**: `http://localhost:3001/api/docs`
 - **Default Seed Admin Login**:
   - Email: `admin@verify.et`
   - Password: `AdminPass123!`
@@ -57,26 +56,11 @@ pnpm dev
 
 ### Method 2: Full Docker Stack Containerized Mode
 
-Run the entire application stack (PostgreSQL + NestJS API + Next.js Web + Nginx Reverse Proxy) inside Docker:
-
 ```bash
-# Build and start all services in background
 docker compose up -d --build
 ```
 
 #### Service URLs:
 - **Nginx Entrypoint**: `http://localhost`
-  - Web UI routed to `http://localhost/`
-  - API routed to `http://localhost/api/v1`
-
----
-
-## Testing & Build Commands
-
-```bash
-# Run unit tests (mocking external Verify.ET API responses & ticket math)
-pnpm --filter payment-verification-api test
-
-# Build all workspace packages & applications
-pnpm turbo run build
-```
+  - Web UI: `http://localhost/`
+  - API: `http://localhost/api/v1`
