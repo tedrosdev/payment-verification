@@ -42,7 +42,7 @@ export default function SubmissionsPage() {
       <div>
         <h1 style={{ fontSize: '1.75rem', fontWeight: 800 }}>Payment Submissions Audit Log</h1>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>
-          Historical record of all payment references processed through Verify.ET.
+          Historical record of all processed bank payment references.
         </p>
       </div>
 

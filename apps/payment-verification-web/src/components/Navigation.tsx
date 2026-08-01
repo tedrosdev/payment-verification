@@ -32,7 +32,7 @@ export function Navigation() {
         <div className="brand-icon">
           <ShieldCheck size={22} />
         </div>
-        <span>Verify.ET Ticketing</span>
+        <span>Payment Verification & Ticketing</span>
       </div>
 
       <nav className="nav-links">

@@ -4,7 +4,7 @@ exports.webEnvSchema = exports.apiEnvSchema = void 0;
 const zod_1 = require("zod");
 exports.apiEnvSchema = zod_1.z.object({
     PORT: zod_1.z.string().default('3001'),
-    DATABASE_URL: zod_1.z.string().default('postgresql://postgres:postgres@localhost:5432/payment_verification?schema=public'),
+    DATABASE_URL: zod_1.z.string().default('postgresql://postgres:postgrespassword@localhost:5434/payment_verification?schema=public'),
     JWT_ACCESS_SECRET: zod_1.z.string().default('super-secret-access-token-key-change-in-prod'),
     JWT_REFRESH_SECRET: zod_1.z.string().default('super-secret-refresh-token-key-change-in-prod'),
     JWT_EXPIRES_IN: zod_1.z.string().default('1d'),

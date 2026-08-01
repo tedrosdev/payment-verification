@@ -228,7 +228,7 @@ export class VerifyEtService {
       if (processingStatus === 'queued' || processingStatus === 'pending') {
         reason = `Payment verification queued/pending with bank (requestId: ${rawResponse.requestId})`;
       } else {
-        reason = 'Payment transaction reference could not be verified with bank by Verify.ET';
+        reason = 'Payment transaction reference could not be verified with bank';
       }
     } else if (!settlementMatch) {
       reason = 'Payment settlement account does not match expected merchant account';

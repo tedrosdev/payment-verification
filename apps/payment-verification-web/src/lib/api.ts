@@ -51,31 +51,13 @@ export async function fetchApi<T>(
 
     return await response.json();
   } catch (error: any) {
-    // If backend API server is offline or unreachable during login attempt
-    if (endpoint === '/auth/login' && options.method === 'POST') {
-      const body = options.body ? JSON.parse(options.body as string) : {};
-      if (body.email === 'admin@verify.et' && body.password === 'AdminPass123!') {
-        console.warn('Backend API server offline. Using fallback authentication for seed admin user.');
-        return {
-          accessToken: 'mock-offline-admin-jwt-token-12345',
-          refreshToken: 'mock-offline-admin-refresh-token-12345',
-          user: {
-            id: 'seed-admin-id',
-            email: 'admin@verify.et',
-            name: 'System Admin (Offline Mode)',
-            role: 'SUPER_ADMIN',
-            createdAt: new Date().toISOString(),
-          },
-        } as unknown as T;
-      }
-    }
-
     if (error.message && error.message !== 'Failed to fetch') {
       throw error;
     }
 
+    // Strict requirement: Do not log in if backend is offline. Show clear connection error.
     throw new Error(
-      `Cannot connect to API server at ${API_BASE_URL}. Please ensure the backend NestJS API is running (run 'pnpm dev').`,
+      `Unable to connect to backend API server at ${API_BASE_URL}. Please ensure the NestJS backend API is running (run 'pnpm dev' or start the server).`,
     );
   }
 }

@@ -86,7 +86,7 @@ export default function SettlementAccountsPage() {
       <div>
         <h1 style={{ fontSize: '1.75rem', fontWeight: 800 }}>Settlement Account Configuration</h1>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', marginTop: '4px' }}>
-          Configure bank merchant accounts and <code style={{ color: 'var(--primary)' }}>accountSuffix</code> rules used by Verify.ET for payment verification matching.
+          Configure bank merchant accounts and <code style={{ color: 'var(--primary)' }}>accountSuffix</code> rules used for payment verification matching.
         </p>
       </div>
 
@@ -96,11 +96,11 @@ export default function SettlementAccountsPage() {
         </div>
       )}
 
-      {/* Info Card explaining Verify.ET Suffix Matching */}
+      {/* Info Card explaining Settlement Suffix Matching */}
       <div className="glass-panel" style={{ padding: '24px', background: 'rgba(16, 185, 129, 0.06)', borderColor: 'rgba(16, 185, 129, 0.2)' }}>
         <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#34D399', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <HelpCircle size={18} />
-          Verify.ET Settlement Suffix Matching Rules
+          Bank Settlement Suffix Matching Rules
         </h3>
         <ul style={{ color: 'var(--text-muted)', fontSize: '0.88rem', paddingLeft: '24px', lineHeight: 1.6 }}>
           <li><strong>CBE & BOA</strong>: Require <code style={{ color: '#34D399' }}>accountSuffix</code> (e.g., the last 4 digits of your account) to ensure customer transfers arrived at your exact merchant account.</li>
@@ -233,7 +233,7 @@ export default function SettlementAccountsPage() {
                   onChange={(e) => setEditingAccount({ ...editingAccount, accountSuffix: e.target.value })}
                 />
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
-                  Used by Verify.ET payload field <code style={{ color: 'var(--primary)' }}>accountSuffix</code> for settlement verification.
+                  Used for <code style={{ color: 'var(--primary)' }}>accountSuffix</code> settlement verification.
                 </span>
               </div>
 

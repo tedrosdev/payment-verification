@@ -71,7 +71,7 @@ export default function LoginPage() {
             <ShieldCheck size={36} />
           </div>
           <h1 style={{ fontSize: '1.65rem', fontWeight: 800, color: '#F9FAFB', letterSpacing: '-0.02em', margin: 0 }}>
-            Verify.ET Ticketing
+            Payment Verification & Ticketing
           </h1>
           <p style={{ color: '#9CA3AF', fontSize: '0.9rem', marginTop: '8px' }}>
             Sign in to access admin verification console

@@ -51,10 +51,10 @@ export default function ApiLogsPage() {
         <div>
           <h1 style={{ fontSize: '1.75rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '10px' }}>
             <Terminal size={28} style={{ color: 'var(--primary)' }} />
-            Verify.ET API Request & Response Audit Logs
+            Bank Verification API Audit Logs
           </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', marginTop: '4px' }}>
-            Inspect full outgoing requests sent to <code style={{ color: 'var(--primary)' }}>https://verify.et/api/verify</code> and raw incoming responses.
+            Inspect full outgoing deposit verification requests and raw incoming responses.
           </p>
         </div>
 
@@ -134,7 +134,7 @@ export default function ApiLogsPage() {
               <th>Reference Number</th>
               <th>Status</th>
               <th>Deposited Amount</th>
-              <th>Verify.ET Request ID</th>
+              <th>Verification Request ID</th>
               <th>Action</th>
             </tr>
           </thead>
@@ -191,7 +191,7 @@ export default function ApiLogsPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <Code size={22} style={{ color: 'var(--primary)' }} />
                 <div>
-                  <h2 style={{ fontSize: '1.2rem', fontWeight: 800 }}>Verify.ET Request & Response Payload</h2>
+                  <h2 style={{ fontSize: '1.2rem', fontWeight: 800 }}>Verification Request & Response Payload</h2>
                   <p style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>Ref: {selectedLog.referenceNumber} | Bank: {selectedLog.bank}</p>
                 </div>
               </div>
@@ -210,16 +210,16 @@ export default function ApiLogsPage() {
 
               <div>
                 <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }}>
-                  Verify.ET Endpoint URL & Method
+                  API Endpoint URL & Method
                 </h4>
                 <div style={{ background: 'rgba(0,0,0,0.4)', padding: '10px 14px', borderRadius: '8px', fontSize: '0.85rem', fontFamily: 'monospace', color: '#34D399' }}>
-                  POST https://verify.et/api/verify
+                  POST /api/verify
                 </div>
               </div>
 
               <div>
                 <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }}>
-                  Raw Verify.ET Response Body (JSON)
+                  Raw Verification Response Body (JSON)
                 </h4>
                 <pre style={{
                   background: 'rgba(0,0,0,0.5)',

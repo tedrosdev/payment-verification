@@ -80,7 +80,7 @@ export default function VerifyPaymentPage() {
       <div>
         <h1 style={{ fontSize: '1.75rem', fontWeight: 800 }}>Payment Verification & Ticket Generator</h1>
         <p style={{ color: 'var(--text-muted)', marginTop: '4px' }}>
-          Enter customer payment details received over Telegram/WhatsApp/Imo to verify against Verify.ET and issue instant ticket codes.
+          Enter customer payment details received over Telegram/WhatsApp/Imo to verify deposit and issue instant ticket codes.
         </p>
       </div>
 
@@ -182,7 +182,7 @@ export default function VerifyPaymentPage() {
               className="btn btn-primary"
               style={{ width: '100%', padding: '14px' }}
             >
-              {loading ? 'Verifying with Verify.ET...' : 'Verify & Issue Tickets'}
+              {loading ? 'Verifying Deposit...' : 'Verify & Issue Tickets'}
             </button>
           </form>
         </div>
@@ -205,7 +205,7 @@ export default function VerifyPaymentPage() {
           {loading && (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', color: 'var(--text-muted)' }}>
               <RefreshCw size={36} className="spin" style={{ marginBottom: '16px', color: 'var(--primary)' }} />
-              <p style={{ fontWeight: 600 }}>Communicating with Verify.ET API...</p>
+              <p style={{ fontWeight: 600 }}>Communicating with Bank Verification Network...</p>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>Checking transaction settlement and deduplication rules</p>
             </div>
           )}
