@@ -126,61 +126,63 @@ export default function ApiLogsPage() {
 
       {/* Logs Table */}
       <div className="glass-panel" style={{ padding: '0', overflow: 'hidden' }}>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Timestamp</th>
-              <th>Bank</th>
-              <th>Reference Number</th>
-              <th>Status</th>
-              <th>Deposited Amount</th>
-              <th>Verification Request ID</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredLogs.length === 0 ? (
+        <div className="table-responsive-container">
+          <table className="data-table">
+            <thead>
               <tr>
-                <td colSpan={7} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-dim)' }}>
-                  No API request logs found matching criteria.
-                </td>
+                <th>Timestamp</th>
+                <th>Bank</th>
+                <th>Reference Number</th>
+                <th>Status</th>
+                <th>Deposited Amount</th>
+                <th>Verification Request ID</th>
+                <th>Action</th>
               </tr>
-            ) : (
-              filteredLogs.map((log) => (
-                <tr key={log.id}>
-                  <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-                    {new Date(log.createdAt).toLocaleString()}
-                  </td>
-                  <td>
-                    <span style={{ fontWeight: 800, color: 'var(--text-main)' }}>{log.bank}</span>
-                  </td>
-                  <td>
-                    <code style={{ fontSize: '0.9rem', color: 'var(--primary)' }}>{log.referenceNumber}</code>
-                  </td>
-                  <td>
-                    <span className={`badge badge-${log.status.toLowerCase()}`}>
-                      {log.status}
-                    </span>
-                  </td>
-                  <td style={{ fontWeight: 700 }}>{log.amount} ETB</td>
-                  <td style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>
-                    {log.verifyEtRequestId || '-'}
-                  </td>
-                  <td>
-                    <button
-                      onClick={() => setSelectedLog(log)}
-                      className="btn btn-secondary"
-                      style={{ padding: '4px 10px', fontSize: '0.78rem' }}
-                    >
-                      <Code size={14} />
-                      <span>Inspect Payload</span>
-                    </button>
+            </thead>
+            <tbody>
+              {filteredLogs.length === 0 ? (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-dim)' }}>
+                    No API request logs found matching criteria.
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                filteredLogs.map((log) => (
+                  <tr key={log.id}>
+                    <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                      {new Date(log.createdAt).toLocaleString()}
+                    </td>
+                    <td>
+                      <span style={{ fontWeight: 800, color: 'var(--text-main)' }}>{log.bank}</span>
+                    </td>
+                    <td>
+                      <code style={{ fontSize: '0.9rem', color: 'var(--primary)' }}>{log.referenceNumber}</code>
+                    </td>
+                    <td>
+                      <span className={`badge badge-${log.status.toLowerCase()}`}>
+                        {log.status}
+                      </span>
+                    </td>
+                    <td style={{ fontWeight: 700 }}>{log.amount} ETB</td>
+                    <td style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>
+                      {log.verifyEtRequestId || '-'}
+                    </td>
+                    <td>
+                      <button
+                        onClick={() => setSelectedLog(log)}
+                        className="btn btn-secondary"
+                        style={{ padding: '4px 10px', fontSize: '0.78rem' }}
+                      >
+                        <Code size={14} />
+                        <span>Inspect Payload</span>
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Raw Payload Inspector Modal */}

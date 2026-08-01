@@ -96,59 +96,61 @@ export default function SubmissionsPage() {
             No submissions matched your search criteria.
           </div>
         ) : (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Bank & Ref</th>
-                <th>Participant</th>
-                <th>Amount</th>
-                <th>Status & Details</th>
-                <th>Issued Ticket Codes</th>
-                <th>Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((s) => (
-                <tr key={s.id}>
-                  <td>
-                    <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>{s.referenceNumber}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>{s.bank}</div>
-                  </td>
-                  <td>
-                    <div>{s.participantPhone}</div>
-                    {s.participantName && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{s.participantName}</div>}
-                  </td>
-                  <td style={{ fontWeight: 800 }}>{s.amount} ETB</td>
-                  <td>
-                    <span className={`badge badge-${s.status.toLowerCase()}`}>
-                      {s.status}
-                    </span>
-                    {s.rejectionReason && (
-                      <div style={{ fontSize: '0.75rem', color: '#F87171', marginTop: '4px', maxWidth: '240px' }}>
-                        {s.rejectionReason}
-                      </div>
-                    )}
-                  </td>
-                  <td>
-                    {s.tickets.length > 0 ? (
-                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                        {s.tickets.map((t) => (
-                          <span key={t.id} className="ticket-chip" style={{ fontSize: '0.8rem', padding: '2px 8px' }}>
-                            {t.code}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <span style={{ color: 'var(--text-dim)', fontSize: '0.8rem' }}>None</span>
-                    )}
-                  </td>
-                  <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    {new Date(s.createdAt).toLocaleString()}
-                  </td>
+          <div className="table-responsive-container">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Bank & Ref</th>
+                  <th>Participant</th>
+                  <th>Amount</th>
+                  <th>Status & Details</th>
+                  <th>Issued Ticket Codes</th>
+                  <th>Date</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filtered.map((s) => (
+                  <tr key={s.id}>
+                    <td>
+                      <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>{s.referenceNumber}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>{s.bank}</div>
+                    </td>
+                    <td>
+                      <div>{s.participantPhone}</div>
+                      {s.participantName && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{s.participantName}</div>}
+                    </td>
+                    <td style={{ fontWeight: 800 }}>{s.amount} ETB</td>
+                    <td>
+                      <span className={`badge badge-${s.status.toLowerCase()}`}>
+                        {s.status}
+                      </span>
+                      {s.rejectionReason && (
+                        <div style={{ fontSize: '0.75rem', color: '#F87171', marginTop: '4px', maxWidth: '240px' }}>
+                          {s.rejectionReason}
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      {s.tickets.length > 0 ? (
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                          {s.tickets.map((t) => (
+                            <span key={t.id} className="ticket-chip" style={{ fontSize: '0.8rem', padding: '2px 8px' }}>
+                              {t.code}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span style={{ color: 'var(--text-dim)', fontSize: '0.8rem' }}>None</span>
+                      )}
+                    </td>
+                    <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                      {new Date(s.createdAt).toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>
